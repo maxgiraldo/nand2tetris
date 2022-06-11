@@ -82,7 +82,11 @@ string
 NoWhiteSpaceStr(string Instr)
 {
     Instr.erase(remove_if(Instr.begin(), Instr.end(), ::isspace), Instr.end());
-    return Instr;
+    int CommentIdx = Instr.find("/");
+    if (CommentIdx != string::npos)
+        return Instr.substr(0, CommentIdx);
+    else
+        return Instr;
 }
 
 // Instr types
