@@ -247,6 +247,14 @@ IsOnlyDigits(string Instr)
     return true;
 }
 
+bool
+IsPresent(string Key, unordered_map<string, int> Map)
+{
+    if (Map.find(Key) == Map.end()) return false;
+
+    return true;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -327,12 +335,12 @@ main(int argc, char *argv[])
                     HackFile << CInstrToBinary(NoSpaceInstr) << endl;
                     break;
                 case A_INSTRUCTION:
-                    if (!IsOnlyDigits(Symbol(NoSpaceInstr)) && !SymTable[Symbol(NoSpaceInstr)])
+                    if (!IsOnlyDigits(Symbol(NoSpaceInstr)) && !IsPresent(Symbol(NoSpaceInstr), SymTable))
                     {
                         SymTable[Symbol(NoSpaceInstr)] = RamIdx++;
                         HackFile << IntToBinary(SymTable[Symbol(NoSpaceInstr)]) << endl;
                     }
-                    else if (SymTable[Symbol(NoSpaceInstr)])
+                    else if (IsPresent(Symbol(NoSpaceInstr), SymTable))
                     {
                         HackFile << IntToBinary(SymTable[Symbol(NoSpaceInstr)]) << endl;
                     }
