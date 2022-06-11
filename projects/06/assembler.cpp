@@ -14,13 +14,6 @@ enum instr_type { A_INSTRUCTION, C_INSTRUCTION, L_INSTRUCTION };
 // C-instruction
 // 111accccccdddjjj
 
-int RamIdx = 16;
-
-unordered_map<string, int> SymMap = {
-    {"SCREEN", 16384},
-    {"KBD", 24576},
-};
-
 unordered_map<string, string> CompSymToBinary =
 {
     {"0", "101010"},
@@ -59,10 +52,18 @@ unordered_map<string, string> DestSymToBinary =
     {"M", "001"},
     {"D", "010"},
     {"DM", "011"},
+    {"MD", "011"},
     {"A", "100"},
     {"AM", "101"},
+    {"MA", "101"},
     {"AD", "110"},
+    {"DA", "110"},
     {"ADM", "111"},
+    {"AMD", "111"},
+    {"DAM", "111"},
+    {"DMA", "111"},
+    {"MDA", "111"},
+    {"MAD", "111"},
 };
 
 unordered_map<string, string> JumpSymToBinary =
@@ -80,14 +81,8 @@ unordered_map<string, string> JumpSymToBinary =
 string
 NoWhiteSpaceStr(string Instr)
 {
-    char CurrentChar = Instr[0];
-    int CharIdx = 1;
-    while (CurrentChar == ' ' || CurrentChar == '\t')
-    {
-        CurrentChar = Instr[CharIdx++];
-    }
-
-    return Instr.substr(CharIdx-1, Instr.length() - 2);
+    Instr.erase(remove_if(Instr.begin(), Instr.end(), ::isspace), Instr.end());
+    return Instr;
 }
 
 // Instr types
@@ -142,19 +137,16 @@ InstructionType(string Instr)
 string
 Symbol(string Instr)
 {
-    int LastCharIdx = Instr.length() - 3;
+    int LastCharIdx = Instr.length() - 1;
     int StartIdx = 1;
 
     if (IsLabel(Instr))
     {
         StartIdx = Instr.find("(") + 1;
-        if (Instr.find("\r") != string::npos) return Instr.substr(StartIdx, Instr.length() - 3);
-
         return Instr.substr(StartIdx, Instr.length() - 2);
     }
 
     StartIdx = Instr.find("@") + 1;
-    if (Instr.find("\r") != string::npos) return Instr.substr(StartIdx, Instr.length() - 2);
     return Instr.substr(StartIdx, Instr.length() - 1);
 }
 
@@ -169,7 +161,7 @@ string
 Comp(string Instr)
 {
     int idx = Instr.find("=");
-    if (idx != string::npos) return Instr.substr(idx+1, Instr.length()-3);
+    if (idx != string::npos) return Instr.substr(idx+1, Instr.length()-1);
 
     idx = Instr.find(";");
     if (idx != string::npos) return Instr.substr(0, idx);
@@ -181,7 +173,6 @@ string
 Jump(string Instr)
 {
     int idx = Instr.find(";");
-    if (Instr[Instr.length() - 1] == '\n') return Instr.substr(idx+1, Instr.length()-2);
 
     return Instr.substr(idx+1, Instr.length()-1);
 }
@@ -228,6 +219,7 @@ CInstrToBinary(string Instr)
     string CompBinary = CompSymToBinary[Comp(Instr)];
     string DestBinary = DestSymToBinary[Dst];
     string JmpBinary = JumpSymToBinary[Jmp];
+
     bool A = (Comp(Instr).find("M") != string::npos);
 
     string Result = "111";
@@ -257,7 +249,41 @@ main(int argc, char *argv[])
     string FileName = argv[1];
     ifstream AsmFile(FileName);
     ifstream AsmFile2(FileName);
+    ofstream HackFile;
+    string OutputFileName = "";
+    OutputFileName.append(FileName.substr(0, FileName.length()-4));
+    OutputFileName.append(".hack");
+    HackFile.open(OutputFileName);
     string Instr;
+    string NoSpaceInstr;
+    int RamIdx = 16;
+    int LineNum = -1;
+
+    unordered_map<string, int> SymTable = {
+        {"R0", 0},
+        {"R1", 1},
+        {"R2", 2},
+        {"R3", 3},
+        {"R4", 4},
+        {"R5", 5},
+        {"R6", 6},
+        {"R7", 7},
+        {"R8", 8},
+        {"R9", 9},
+        {"R10", 10},
+        {"R11", 11},
+        {"R12", 21},
+        {"R13", 13},
+        {"R14", 14},
+        {"R15", 15},
+        {"SP", 0},
+        {"LCL", 1},
+        {"ARG", 2},
+        {"THIS", 3},
+        {"THAT", 4},
+        {"SCREEN", 16384},
+        {"KBD", 24576},
+    };
 
     if (AsmFile.is_open())
     {
@@ -266,26 +292,55 @@ main(int argc, char *argv[])
             getline(AsmFile, Instr);
             if (IsComment(Instr)) continue;
             if (IsEmptyLine(Instr)) continue;
-            switch (InstructionType(Instr)) {
+
+            NoSpaceInstr = NoWhiteSpaceStr(Instr);
+            switch (InstructionType(NoSpaceInstr)) {
                 case C_INSTRUCTION:
-                    cout << CInstrToBinary(Instr) << endl;
+                    LineNum++;
                     break;
                 case A_INSTRUCTION:
-                    if (!IsOnlyDigits(Symbol(Instr)) && !SymMap[Symbol(Instr)])
-                        SymMap[Symbol(Instr)] = RamIdx++;
+                    LineNum++;
                     break;
                 case L_INSTRUCTION:
-                    if (!SymMap[Symbol(Instr)])
-                        SymMap[Symbol(Instr)] = RamIdx++;
+                    if (!SymTable[Symbol(NoSpaceInstr)])
+                        SymTable[Symbol(NoSpaceInstr)] = LineNum + 1;
                     break;
             }
         }
     }
-    //if (AsmFile2.is_open())
-    //{
-        //while (AsmFile2)
-        //{
-            //getline(AsmFile2, Instr);
-        //}
-    //}
+    if (AsmFile2.is_open())
+    {
+        while (AsmFile2)
+        {
+            getline(AsmFile2, Instr);
+            if (IsComment(Instr)) continue;
+            if (IsEmptyLine(Instr)) continue;
+
+            NoSpaceInstr = NoWhiteSpaceStr(Instr);
+            switch (InstructionType(NoSpaceInstr))
+            {
+                case C_INSTRUCTION:
+                    HackFile << CInstrToBinary(NoSpaceInstr) << endl;
+                    break;
+                case A_INSTRUCTION:
+                    if (!IsOnlyDigits(Symbol(NoSpaceInstr)) && !SymTable[Symbol(NoSpaceInstr)])
+                    {
+                        SymTable[Symbol(NoSpaceInstr)] = RamIdx++;
+                        HackFile << IntToBinary(SymTable[Symbol(NoSpaceInstr)]) << endl;
+                    }
+                    else if (SymTable[Symbol(NoSpaceInstr)])
+                    {
+                        HackFile << IntToBinary(SymTable[Symbol(NoSpaceInstr)]) << endl;
+                    }
+                    else
+                    {
+                        HackFile << IntToBinary(stoi(Symbol(NoSpaceInstr))) << endl;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    HackFile.close();
 }
